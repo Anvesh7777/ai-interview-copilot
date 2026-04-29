@@ -28,33 +28,107 @@ const atsRoutes =
     "./routes/ats"
   );
 
+/*
+|--------------------------------------------------------------------------
+| Connect Database
+|--------------------------------------------------------------------------
+*/
+
 connectDB();
 
 const app = express();
 
+/*
+|--------------------------------------------------------------------------
+| CORS Configuration
+|--------------------------------------------------------------------------
+*/
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 app.use(
   cors({
-    origin:
-      "http://localhost:5173",
+    origin: (
+      origin,
+      callback
+    ) => {
+      // allow tools like Postman
+      if (!origin) {
+        return callback(
+          null,
+          true
+        );
+      }
+
+      if (
+        allowedOrigins.includes(
+          origin
+        )
+      ) {
+        return callback(
+          null,
+          true
+        );
+      }
+
+      return callback(
+        new Error(
+          "CORS policy blocked this origin"
+        )
+      );
+    },
     credentials: true,
   })
 );
 
-app.use(express.json());
+/*
+|--------------------------------------------------------------------------
+| Body Parsers
+|--------------------------------------------------------------------------
+*/
+
+app.use(
+  express.json({
+    limit: "10mb",
+  })
+);
 
 app.use(
   express.urlencoded({
     extended: true,
+    limit: "10mb",
   })
 );
 
-app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message:
-      "AI Interview Copilot API running 🚀",
-  });
-});
+/*
+|--------------------------------------------------------------------------
+| Health Check
+|--------------------------------------------------------------------------
+*/
+
+app.get(
+  "/",
+  (req, res) => {
+    res.status(200).json({
+      success: true,
+      message:
+        "AI Interview Copilot API running 🚀",
+      environment:
+        process.env
+          .NODE_ENV ||
+        "development",
+    });
+  }
+);
+
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+*/
 
 app.use(
   "/api/auth",
@@ -86,11 +160,66 @@ app.use(
   atsRoutes
 );
 
-const PORT =
-  process.env.PORT || 5000;
+/*
+|--------------------------------------------------------------------------
+| 404 Handler (Express 5 safe)
+|--------------------------------------------------------------------------
+*/
 
-app.listen(PORT, () => {
-  console.log(
-    `Server running on port ${PORT} 🚀`
-  );
-});
+app.use(
+  (req, res) => {
+    res.status(404).json({
+      success: false,
+      message:
+        "Route not found",
+    });
+  }
+);
+
+/*
+|--------------------------------------------------------------------------
+| Global Error Handler
+|--------------------------------------------------------------------------
+*/
+
+app.use(
+  (
+    err,
+    req,
+    res,
+    next
+  ) => {
+    console.error(
+      "Server Error:",
+      err.message
+    );
+
+    res.status(
+      err.status || 500
+    ).json({
+      success: false,
+      message:
+        err.message ||
+        "Internal Server Error",
+    });
+  }
+);
+
+/*
+|--------------------------------------------------------------------------
+| Start Server
+|--------------------------------------------------------------------------
+*/
+
+const PORT =
+  process.env.PORT ||
+  5000;
+
+app.listen(
+  PORT,
+  () => {
+    console.log(
+      `Server running on port ${PORT} 🚀`
+    );
+  }
+);
