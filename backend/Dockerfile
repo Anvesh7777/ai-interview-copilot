@@ -1,5 +1,10 @@
 FROM chromadb/chroma:0.5.3
 
-EXPOSE 8000
+WORKDIR /chroma
 
-CMD ["uvicorn", "chromadb.app:app", "--host", "0.0.0.0", "--port", "8000"]
+ENV IS_PERSISTENT=TRUE
+ENV PERSIST_DIRECTORY=/chroma/chroma-data
+ENV ANONYMIZED_TELEMETRY=FALSE
+ENV CHROMA_SERVER_CORS_ALLOW_ORIGINS=["*"]
+
+EXPOSE 8000
