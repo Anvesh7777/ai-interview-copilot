@@ -1,33 +1,33 @@
 # AI Interview Copilot 🚀
 
-AI Interview Copilot is an intelligent interview preparation platform that helps users optimize resumes, analyze ATS compatibility, practice mock interviews, and generate personalized revision plans using AI.
+AI Interview Copilot is an AI-powered interview preparation platform that helps users analyze resumes, calculate ATS scores, practice mock interviews, and generate personalized revision plans.
 
 ## ✨ Features
 
 ### 📄 Resume Analysis
 
-* Upload your resume in PDF format
-* Extracts and parses resume content
-* Generates structured candidate insights
+* Upload resume in PDF format
+* Extract and analyze candidate profile
+* Parse technical skills and experience
 
-### 🎯 ATS Report Generation
+### 🎯 ATS Score Generation
 
-* Matches resume against Job Description (JD)
-* Generates ATS compatibility score
-* Highlights strengths, weaknesses, and suggestions
+* Compare resume against Job Description
+* Generate ATS compatibility score
+* Strengths and improvement suggestions
 
 ### 💼 Job Description Analysis
 
-* Upload JD PDFs
-* Extracts role, experience, and relevant keywords
-* Enables ATS comparison and targeted interview prep
+* Upload JD PDF
+* Extract role, experience, and keywords
+* Use for ATS matching and targeted prep
 
-### 🎤 AI Mock Interviews
+### 🎤 Mock Interview
 
-* Domain-specific interview generation
-* Technical questions based on selected stack
-* Timer-based interview experience
-* AI-generated feedback report
+* Domain-based interview generation
+* AI-generated technical questions
+* Timer-based interview simulation
+* Detailed feedback report
 
 Supported domains:
 
@@ -46,16 +46,16 @@ Supported domains:
 
 ### 📚 Revision Planner
 
-* Generates personalized revision roadmap
-* Prioritizes weak topics
-* Recommends resources
-* Estimates completion time
+* Personalized revision roadmap
+* Weak-topic prioritization
+* Resource recommendations
+* Estimated completion time
 
 ### 📜 History Tracking
 
-* Stores previous ATS reports
-* Stores interview history
-* Enables progress tracking
+* ATS report history
+* Interview history
+* Performance tracking
 
 ---
 
@@ -80,16 +80,16 @@ Supported domains:
 * Cloudinary
 * Redis
 
-### AI / LLM
+### AI Stack
 
 * Groq API
 * LangChain
-* ChromaDB (Vector Store)
+* ChromaDB
 * RAG Pipeline
 
 ---
 
-## 🏗 System Architecture
+## 🏗 Architecture
 
 ```text
 Frontend (React)
@@ -97,10 +97,10 @@ Frontend (React)
         v
 Backend (Express)
         |
-        +--> MongoDB
+        +--> MongoDB Atlas
         +--> Redis
         +--> Cloudinary
-        +--> Groq LLM
+        +--> Groq API
         +--> ChromaDB
 ```
 
@@ -111,27 +111,15 @@ Backend (Express)
 ```text
 ai-interview-copilot/
 │── frontend/
-│   ├── src/
-│   ├── pages/
-│   ├── components/
-│   ├── api/
-│   └── context/
-│
 │── backend/
-│   ├── controllers/
-│   ├── routes/
-│   ├── models/
-│   ├── middleware/
-│   ├── services/
-│   ├── utils/
-│   └── config/
+│── README.md
 ```
 
 ---
 
 ## ⚙️ Installation
 
-### Clone the repository
+### Clone Repository
 
 ```bash
 git clone https://github.com/Anvesh7777/ai-interview-copilot.git
@@ -143,25 +131,6 @@ cd ai-interview-copilot
 ```bash
 cd backend
 npm install
-```
-
-Create `.env` file:
-
-```env
-PORT=5000
-MONGO_URI=your_mongodb_uri
-JWT_SECRET=your_secret
-GROQ_API_KEY=your_groq_api_key
-REDIS_URL=your_redis_url
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
-CHROMA_HOST=your_chroma_host
-```
-
-Run backend:
-
-```bash
 npm run dev
 ```
 
@@ -170,19 +139,21 @@ npm run dev
 ```bash
 cd frontend
 npm install
-```
-
-Create `.env` file:
-
-```env
-VITE_API_URL=http://localhost:5000/api
-VITE_GOOGLE_CLIENT_ID=your_google_client_id
-```
-
-Run frontend:
-
-```bash
 npm run dev
+```
+
+---
+
+## 🔐 .gitignore (Important)
+
+```gitignore
+node_modules/
+.env
+backend/.env
+frontend/.env
+backend/uploads/
+dist/
+build/
 ```
 
 ---
@@ -191,31 +162,23 @@ npm run dev
 
 ### Frontend
 
-Deployed on Vercel
+* Vercel
 
 ### Backend
 
-Deployed on Render
+* Render
 
 ### Database
 
-MongoDB Atlas
+* MongoDB Atlas
 
 ### File Storage
 
-Cloudinary
+* Cloudinary
 
 ### Vector Database
 
-ChromaDB
-
----
-
-## 🔐 Authentication
-
-* JWT based authentication
-* Protected routes
-* Google OAuth support
+* ChromaDB
 
 ---
 
@@ -223,35 +186,34 @@ ChromaDB
 
 ### Resume
 
-* `POST /api/resume/upload`
+* POST `/api/resume/upload`
 
 ### Job Description
 
-* `POST /api/job-description/upload`
+* POST `/api/job-description/upload`
 
 ### ATS
 
-* `GET /api/ats/report`
+* GET `/api/ats/report`
 
 ### Interview
 
-* `POST /api/interview/start`
-* `POST /api/interview/submit`
-* `GET /api/interview/report`
-* `GET /api/interview/revision-plan`
+* POST `/api/interview/start`
+* POST `/api/interview/submit`
+* GET `/api/interview/report`
+* GET `/api/interview/revision-plan`
 
 ### History
 
-* `GET /api/history`
+* GET `/api/history`
 
 ---
 
-## 🔥 Future Improvements
+## 🔥 Future Scope
 
-* Voice-based mock interviews
-* Live coding interview environment
-* Company-specific interview rounds
-* Resume improvement suggestions
+* Voice interviews
+* Live coding rounds
+* Company-specific interview flows
 * Analytics dashboard
 
 ---
@@ -260,11 +222,11 @@ ChromaDB
 
 **Anvesh Mahajan**
 
-* GitHub: [https://github.com/Anvesh7777](https://github.com/Anvesh7777)
-* LinkedIn: [https://www.linkedin.com/in/anvesh77/](https://www.linkedin.com/in/anvesh77/)
+GitHub: [https://github.com/Anvesh7777](https://github.com/Anvesh7777)
+LinkedIn: [https://www.linkedin.com/in/anvesh77/](https://www.linkedin.com/in/anvesh77/)
 
 ---
 
 ## ⭐ Support
 
-If you found this project useful, consider starring the repository.
+If you found this useful, star the repo ⭐
