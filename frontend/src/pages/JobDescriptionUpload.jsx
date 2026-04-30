@@ -1,8 +1,7 @@
-import React, {
+import React,
+{
   useState,
 } from "react";
-
-import axios from "axios";
 
 import {
   useDropzone,
@@ -12,71 +11,109 @@ import {
   motion,
 } from "framer-motion";
 
-import uploadImage from "../assets/upload.svg";
-
 import {
   UploadCloud,
   CheckCircle,
 } from "lucide-react";
+
+import api from "../api/axios";
+
+import uploadImage from "../assets/upload.svg";
 
 const JobDescriptionUpload =
   () => {
     const [
       file,
       setFile,
-    ] = useState(
-      null
-    );
+    ] =
+      useState(
+        null
+      );
 
     const [
       loading,
       setLoading,
-    ] = useState(
-      false
-    );
+    ] =
+      useState(
+        false
+      );
 
     const [
       success,
       setSuccess,
-    ] = useState(
-      false
-    );
+    ] =
+      useState(
+        false
+      );
 
-    const onDrop = (
-      acceptedFiles
-    ) => {
-      if (
-        acceptedFiles.length >
-        0
-      ) {
-        setFile(
-          acceptedFiles[0]
-        );
-      }
-    };
+    const [
+      error,
+      setError,
+    ] =
+      useState(
+        ""
+      );
+
+    const onDrop =
+      (
+        acceptedFiles
+      ) => {
+        if (
+          acceptedFiles.length >
+          0
+        ) {
+          setFile(
+            acceptedFiles[0]
+          );
+
+          setSuccess(
+            false
+          );
+
+          setError(
+            ""
+          );
+        }
+      };
 
     const {
       getRootProps,
       getInputProps,
     } =
-      useDropzone({
-        onDrop,
-        accept: {
-          "application/pdf":
-            [".pdf"],
-        },
-        multiple:
-          false,
-      });
+      useDropzone(
+        {
+          onDrop,
+          accept:
+            {
+              "application/pdf":
+                [
+                  ".pdf",
+                ],
+            },
+          multiple:
+            false,
+        }
+      );
 
     const handleUpload =
       async () => {
-        if (!file)
+        if (
+          !file
+        ) {
+          setError(
+            "Please select a job description file."
+          );
+
           return;
+        }
 
         try {
           setLoading(
             true
+          );
+
+          setError(
+            ""
           );
 
           const formData =
@@ -87,17 +124,23 @@ const JobDescriptionUpload =
             file
           );
 
-          formData.append(
-            "userId",
-            localStorage.getItem(
-              "userId"
-            )
-          );
+          /*
+          |---------------------------------------------
+          | JWT auto-attached via interceptor
+          |---------------------------------------------
+          */
 
           const res =
-            await axios.post(
-              "http://localhost:5000/api/job-description/upload",
-              formData
+            await api.post(
+              "/job-description/upload",
+              formData,
+              {
+                headers:
+                  {
+                    "Content-Type":
+                      "multipart/form-data",
+                  },
+              }
             );
 
           if (
@@ -106,16 +149,26 @@ const JobDescriptionUpload =
           ) {
             localStorage.setItem(
               "jobDescriptionId",
-              res.data.jobDescriptionId
+              res.data
+                .jobDescriptionId
             );
 
             setSuccess(
               true
             );
           }
-        } catch (error) {
+        } catch (
+          error
+        ) {
           console.error(
             error
+          );
+
+          setError(
+            error.response
+              ?.data
+              ?.message ||
+              "Upload failed"
           );
         } finally {
           setLoading(
@@ -225,11 +278,19 @@ const JobDescriptionUpload =
               className="mt-8 flex items-center gap-3 text-green-600 font-medium"
             >
               <CheckCircle />
-              Job
-              Description
+              Job Description
               uploaded
               successfully
             </motion.div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <p className="mt-6 text-red-500 font-medium">
+              {
+                error
+              }
+            </p>
           )}
         </motion.div>
       </div>

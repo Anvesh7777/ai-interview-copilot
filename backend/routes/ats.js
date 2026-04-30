@@ -1,8 +1,15 @@
 const express =
-  require("express");
+  require(
+    "express"
+  );
 
 const router =
   express.Router();
+
+const authMiddleware =
+  require(
+    "../middleware/authMiddleware"
+  );
 
 const {
   generateATSReport,
@@ -10,8 +17,15 @@ const {
   "../controllers/atsController"
 );
 
+/*
+|---------------------------------------------------------
+| ATS Routes
+|---------------------------------------------------------
+*/
+
 router.post(
   "/analyze",
+  authMiddleware,
   generateATSReport
 );
 

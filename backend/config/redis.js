@@ -1,20 +1,101 @@
-const Redis = require("ioredis");
+const Redis =
+  require(
+    "ioredis"
+  );
 
-const redis = new Redis(
-  process.env.REDIS_URL
+/*
+|---------------------------------------------------------
+| Validate Environment
+|---------------------------------------------------------
+*/
+
+if (
+  !process.env
+    .REDIS_URL
+) {
+  throw new Error(
+    "REDIS_URL is missing"
+  );
+}
+
+/*
+|---------------------------------------------------------
+| Redis Client
+|---------------------------------------------------------
+*/
+
+const redis =
+  new Redis(
+    process.env
+      .REDIS_URL,
+    {
+      maxRetriesPerRequest:
+        3,
+
+      retryStrategy:
+        (
+          times
+        ) => {
+          const delay =
+            Math.min(
+              times *
+                200,
+              2000
+            );
+
+          console.log(
+            `Redis reconnecting in ${delay}ms...`
+          );
+
+          return delay;
+        },
+    }
+  );
+
+/*
+|---------------------------------------------------------
+| Redis Events
+|---------------------------------------------------------
+*/
+
+redis.on(
+  "connect",
+  () => {
+    console.log(
+      "Redis connected ✅"
+    );
+  }
 );
 
-redis.on("connect", () => {
-  console.log(
-    "Redis connected ✅"
-  );
-});
+redis.on(
+  "ready",
+  () => {
+    console.log(
+      "Redis ready 🚀"
+    );
+  }
+);
 
-redis.on("error", (err) => {
-  console.log(
-    "Redis Error:",
-    err.message
-  );
-});
+redis.on(
+  "reconnecting",
+  () => {
+    console.log(
+      "Redis reconnecting 🔄"
+    );
+  }
+);
 
-module.exports = redis;
+redis.on(
+  "error",
+  (
+    err
+  ) => {
+    console.error(
+      "Redis Error:",
+      err.message
+    );
+  }
+);
+
+module.exports =
+  redis;

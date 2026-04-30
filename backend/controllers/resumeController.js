@@ -1,10 +1,21 @@
-const Resume = require(
-  "../models/Resume"
-);
+const Resume =
+  require(
+    "../models/Resume"
+  );
+
+const User =
+  require(
+    "../models/User"
+  );
 
 const parseResume =
   require(
     "../services/parserService"
+  );
+
+const analyzeATS =
+  require(
+    "../services/atsService"
   );
 
 const chunkText =
@@ -26,65 +37,68 @@ const cloudinary =
 const fs =
   require("fs");
 
-const uploadResume =
-  async (req, res) => {
-    try {
-      console.log(
-        "Step 1: File received"
-      );
+/*
+|---------------------------------------------------------
+| Upload Resume
+|---------------------------------------------------------
+*/
 
-      if (!req.file) {
+const uploadResume =
+  async (
+    req,
+    res
+  ) => {
+    let filePath =
+      null;
+
+    try {
+      if (
+        !req.file
+      ) {
         return res
-          .status(400)
+          .status(
+            400
+          )
           .json({
-            success: false,
+            success:
+              false,
             message:
               "No file uploaded",
           });
       }
 
+      /*
+      |---------------------------------------------
+      | Authenticated User
+      |---------------------------------------------
+      */
+
       const userId =
-        req.body.userId;
+        req.user._id;
 
-      console.log(
-        "Step 2: User ID ->",
-        userId
-      );
-
-      if (!userId) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              "User ID missing",
-          });
-      }
-
-      const filePath =
+      filePath =
         req.file.path;
 
-      console.log(
-        "Step 3: Local File Path ->",
-        filePath
-      );
+      /*
+      |---------------------------------------------
+      | Parse Resume
+      |---------------------------------------------
+      */
 
-      console.log(
-        "Step 4: Parsing PDF..."
-      );
-
-      const extractedText =
+      const {
+        text:
+          extractedText,
+        sections,
+      } =
         await parseResume(
           filePath
         );
 
-      console.log(
-        "Step 5: PDF parsed successfully"
-      );
-
-      console.log(
-        "Step 6: Uploading to Cloudinary..."
-      );
+      /*
+      |---------------------------------------------
+      | Upload to Cloudinary
+      |---------------------------------------------
+      */
 
       const cloudinaryResult =
         await cloudinary.uploader.upload(
@@ -97,55 +111,87 @@ const uploadResume =
           }
         );
 
-      console.log(
-        "Step 7: Uploaded to Cloudinary"
-      );
+      /*
+      |---------------------------------------------
+      | Chunk Resume
+      |---------------------------------------------
+      */
 
       const chunks =
         chunkText(
           extractedText
         );
 
-      console.log(
-        "Step 8: Total chunks ->",
-        chunks.length
-      );
+      /*
+      |---------------------------------------------
+      | ATS Analysis
+      |---------------------------------------------
+      */
+
+      const atsReport =
+        await analyzeATS(
+          extractedText
+        );
+
+      /*
+      |---------------------------------------------
+      | Create Resume Record
+      |---------------------------------------------
+      */
 
       const resume =
-        await Resume.create({
-          user: userId,
+        await Resume.create(
+          {
+            user:
+              userId,
 
-          originalName:
-            req.file.originalname,
+            originalName:
+              req.file
+                .originalname,
 
-          filePath:
             filePath,
 
-          cloudinaryUrl:
-            cloudinaryResult.secure_url,
+            cloudinaryUrl:
+              cloudinaryResult.secure_url,
 
-          fileType:
-            req.file.mimetype,
+            fileType:
+              req.file
+                .mimetype,
 
-          extractedText,
+            extractedText,
 
-          chunks,
+            chunks,
 
-          totalChunks:
-            chunks.length,
-        });
+            skills:
+              sections.skills.map(
+                (
+                  skill
+                ) => ({
+                  name:
+                    skill,
+                })
+              ),
 
-      console.log(
-        "Step 9: Resume saved in Mongo"
-      );
+            experienceLevel:
+              "Unknown",
+
+            atsInsights:
+              atsReport,
+
+            totalChunks:
+              chunks.length,
+          }
+        );
+
+      /*
+      |---------------------------------------------
+      | Store Embeddings
+      |---------------------------------------------
+      */
 
       await storeResumeEmbeddings(
         chunks,
         resume._id.toString()
-      );
-
-      console.log(
-        "Step 10: Embeddings stored"
       );
 
       resume.vectorized =
@@ -153,52 +199,90 @@ const uploadResume =
 
       await resume.save();
 
-      console.log(
-        "Step 11: Resume vectorized"
+      /*
+      |---------------------------------------------
+      | Update User Stats
+      |---------------------------------------------
+      */
+
+      await User.findByIdAndUpdate(
+        userId,
+        {
+          $inc: {
+            totalResumes:
+              1,
+          },
+        }
       );
 
-      // Delete local file
-      if (
-        fs.existsSync(
-          filePath
-        )
-      ) {
-        fs.unlinkSync(
-          filePath
-        );
-
-        console.log(
-          "Step 12: Local file deleted"
-        );
-      }
-
       return res
-        .status(200)
+        .status(
+          200
+        )
         .json({
-          success: true,
+          success:
+            true,
           message:
             "Resume uploaded successfully",
           resumeId:
             resume._id,
           cloudinaryUrl:
             resume.cloudinaryUrl,
+          atsInsights:
+            resume.atsInsights,
         });
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
         "Resume Upload Error:",
-        error
+        error.message
       );
 
       return res
-        .status(500)
+        .status(
+          500
+        )
         .json({
-          success: false,
+          success:
+            false,
           message:
             error.message,
         });
+    } finally {
+      /*
+      |---------------------------------------------
+      | Cleanup Local File
+      |---------------------------------------------
+      */
+
+      if (
+        filePath &&
+        fs.existsSync(
+          filePath
+        )
+      ) {
+        try {
+          fs.unlinkSync(
+            filePath
+          );
+
+          console.log(
+            "Resume temp file deleted ✅"
+          );
+        } catch (
+          cleanupError
+        ) {
+          console.error(
+            "Resume cleanup failed:",
+            cleanupError.message
+          );
+        }
+      }
     }
   };
 
-module.exports = {
-  uploadResume,
-};
+module.exports =
+  {
+    uploadResume,
+  };

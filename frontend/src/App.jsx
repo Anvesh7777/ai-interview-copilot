@@ -1,4 +1,5 @@
 import React from "react";
+
 import {
   Routes,
   Route,
@@ -17,30 +18,28 @@ import History from "./pages/History";
 
 import Layout from "./components/Layout";
 
-function ProtectedRoute({
-  children,
-}) {
-  const token =
-    localStorage.getItem(
-      "token"
-    );
-
-  if (!token) {
-    return (
-      <Navigate to="/" replace />
-    );
-  }
-
-  return children;
-}
+import ProtectedRoute from "./routes/ProtectedRoute";
 
 function App() {
   return (
     <Routes>
       {/* Public Routes */}
       <Route
+        path="/login"
+        element={
+          <Login />
+        }
+      />
+
+      {/* Default Redirect */}
+      <Route
         path="/"
-        element={<Login />}
+        element={
+          <Navigate
+            to="/login"
+            replace
+          />
+        }
       />
 
       {/* Protected Routes */}
@@ -86,18 +85,17 @@ function App() {
           }
         />
 
-        {/* IMPORTANT:
-            Keep this as /report
-        */}
+        {/* Session-based Report */}
         <Route
-          path="/report"
+          path="/report/:sessionId"
           element={
             <InterviewReport />
           }
         />
 
+        {/* Session-based Revision Plan */}
         <Route
-          path="/revision-plan"
+          path="/revision-plan/:sessionId"
           element={
             <RevisionPlanner />
           }
@@ -116,7 +114,7 @@ function App() {
         path="*"
         element={
           <Navigate
-            to="/"
+            to="/login"
             replace
           />
         }

@@ -6,8 +6,13 @@ const {
 );
 
 const redis = require(
-  "../config/redis"
-);
+  "../config/redis");
+
+/*
+|---------------------------------------------------------
+| Evaluate Answer
+|---------------------------------------------------------
+*/
 
 const evaluateAnswer =
   async (
@@ -16,22 +21,44 @@ const evaluateAnswer =
   ) => {
     try {
       const cacheKey =
-        `evaluation:${question}:${answer}`;
+        `evaluation:${Buffer.from(
+          question + answer
+        ).toString(
+          "base64"
+        )}`;
+
+      /*
+      |---------------------------------------------
+      | Cache Check
+      |---------------------------------------------
+      */
 
       const cached =
-        await redis.get(
-          cacheKey
-        );
+        await redis
+          .get(
+            cacheKey
+          )
+          .catch(
+            () => null
+          );
 
-      if (cached) {
+      if (
+        cached
+      ) {
         console.log(
-          "Serving evaluation from cache ⚡"
+          "Serving feedback from cache ⚡"
         );
 
         return JSON.parse(
           cached
         );
       }
+
+      /*
+      |---------------------------------------------
+      | Prompt
+      |---------------------------------------------
+      */
 
       const prompt = `
 You are an expert technical interviewer.
@@ -44,36 +71,41 @@ ${question}
 Candidate Answer:
 ${answer}
 
-Rules:
-1. Score from 1 to 10
-2. Give concise feedback
-3. Identify weaknesses
-4. Keep feedback professional
-5. Return ONLY raw JSON
-6. DO NOT wrap JSON inside markdown
-7. DO NOT use backticks
-8. DO NOT add extra text
+Return ONLY raw JSON.
 
-Required JSON format:
+Required JSON:
 
 {
   "score": 0,
   "feedback": "",
-  "weaknesses": []
+  "strengths": [],
+  "weaknesses": [],
+  "improvementAreas": [],
+  "topic": "",
+  "confidenceScore": 0
 }
 `;
+
+      /*
+      |---------------------------------------------
+      | LLM Evaluation
+      |---------------------------------------------
+      */
 
       const response =
         await groq.chat.completions.create(
           {
-            model: MODEL,
-            messages: [
-              {
-                role: "user",
-                content:
-                  prompt,
-              },
-            ],
+            model:
+              MODEL,
+            messages:
+              [
+                {
+                  role:
+                    "user",
+                  content:
+                    prompt,
+                },
+              ],
             temperature:
               0.2,
           }
@@ -81,11 +113,25 @@ Required JSON format:
 
       let raw =
         response
-          .choices[0]
-          .message.content
-          .trim();
+          .choices?.[0]
+          ?.message
+          ?.content
+          ?.trim();
 
-      // remove markdown if model adds it
+      if (
+        !raw
+      ) {
+        throw new Error(
+          "Empty evaluation response."
+        );
+      }
+
+      /*
+      |---------------------------------------------
+      | Clean JSON
+      |---------------------------------------------
+      */
+
       raw = raw
         .replace(
           /```json/g,
@@ -101,36 +147,71 @@ Required JSON format:
 
       try {
         evaluation =
-          JSON.parse(raw);
+          JSON.parse(
+            raw
+          );
       } catch {
-        evaluation = {
-          score: 5,
-          feedback:
-            raw,
-          weaknesses:
-            [],
-        };
+        evaluation =
+          {
+            score:
+              5,
+            feedback:
+              raw,
+            strengths:
+              [],
+            weaknesses:
+              [],
+            improvementAreas:
+              [],
+            topic:
+              "",
+            confidenceScore:
+              5,
+          };
       }
 
-      await redis.set(
-        cacheKey,
-        JSON.stringify(
-          evaluation
-        ),
-        "EX",
-        3600
-      );
+      /*
+      |---------------------------------------------
+      | Cache Save
+      |---------------------------------------------
+      */
+
+      await redis
+        .set(
+          cacheKey,
+          JSON.stringify(
+            evaluation
+          ),
+          "EX",
+          3600
+        )
+        .catch(
+          () => {}
+        );
 
       return evaluation;
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
-        "Evaluation Error:",
+        "Feedback Error:",
         error.message
       );
 
-      throw new Error(
-        error.message
-      );
+      return {
+        score: 5,
+        feedback:
+          "Unable to evaluate answer right now.",
+        strengths:
+          [],
+        weaknesses:
+          [],
+        improvementAreas:
+          [],
+        topic: "",
+        confidenceScore:
+          5,
+      };
     }
   };
 

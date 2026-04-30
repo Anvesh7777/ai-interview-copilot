@@ -1,103 +1,119 @@
-const InterviewSession = require("../models/InterviewSession");
-const Resume = require("../models/Resume");
+const InterviewSession =
+  require(
+    "../models/InterviewSession"
+  );
+
+const Resume =
+  require(
+    "../models/Resume"
+  );
+
+const User =
+  require(
+    "../models/User"
+  );
+
 const {
   generateInterviewQuestion,
-} = require("../services/ragService");
-const evaluateAnswer = require("../services/feedbackService");
-const generatePlan = require("../services/revisionPlannerService");
+} = require(
+  "../services/ragService"
+);
 
-const fullInterviewDomains = [
-  "DSA",
-  "Core CS",
-  "DBMS",
-  "OS",
-  "OOPs",
-  "System Design",
-  "Backend",
-  "Frontend",
-  "Projects",
-];
+const evaluateAnswer =
+  require(
+    "../services/feedbackService"
+  );
 
-const MAX_QUESTIONS = 10;
+const generatePlan =
+  require(
+    "../services/revisionPlannerService"
+  );
 
-/*
-|--------------------------------------------------------------------------
-| Helper: Safe JSON Parser
-|--------------------------------------------------------------------------
-*/
-const parseJSONSafely = (raw) => {
-  try {
-    if (!raw) return null;
+const fullInterviewDomains =
+  [
+    "DSA",
+    "Core CS",
+    "DBMS",
+    "OS",
+    "OOPs",
+    "System Design",
+    "Backend",
+    "Frontend",
+    "Projects",
+  ];
 
-    if (typeof raw === "object") {
-      return raw;
-    }
-
-    const jsonMatch =
-      raw.match(/\{[\s\S]*\}/);
-
-    if (!jsonMatch) {
-      return null;
-    }
-
-    return JSON.parse(
-      jsonMatch[0]
-    );
-  } catch (err) {
-    console.error(
-      "JSON Parse Error:",
-      err
-    );
-    return null;
-  }
-};
+const MAX_QUESTIONS =
+  10;
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 | Start Interview
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 */
+
 const startInterview =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     try {
+      const userId =
+        req.user._id;
+
       const {
-        userId,
         resumeId,
         jobDescriptionId,
         domain,
-      } = req.body;
-
-      console.log(
-        "Start Interview Request:",
-        req.body
-      );
+      } =
+        req.body;
 
       if (
-        !userId ||
         !resumeId ||
         !domain
       ) {
         return res
           .status(400)
           .json({
-            success: false,
+            success:
+              false,
             message:
               "Missing required fields",
           });
       }
 
       const resume =
-        await Resume.findById(
-          resumeId
+        await Resume.findOne(
+          {
+            _id:
+              resumeId,
+            user:
+              userId,
+          }
         );
 
-      if (!resume) {
+      if (
+        !resume
+      ) {
         return res
           .status(404)
           .json({
-            success: false,
+            success:
+              false,
             message:
               "Resume not found",
+          });
+      }
+
+      if (
+        !resume.vectorized
+      ) {
+        return res
+          .status(400)
+          .json({
+            success:
+              false,
+            message:
+              "Resume not vectorized yet",
           });
       }
 
@@ -116,82 +132,111 @@ const startInterview =
       const session =
         await InterviewSession.create(
           {
-            user: userId,
+            user:
+              userId,
             resume:
               resumeId,
             jobDescription:
               jobDescriptionId ||
               null,
             domain,
-            currentLevel: 1,
-            questions: [
-              {
-                question:
-                  firstQuestion,
-                answer: "",
-                feedback:
-                  "",
-                score: 0,
-              },
-            ],
+            domainHistory:
+              [
+                selectedDomain,
+              ],
+            sessionType:
+              domain ===
+              "Complete Interview"
+                ? "complete-interview"
+                : "single-domain",
+            currentLevel:
+              1,
+            totalQuestions:
+              MAX_QUESTIONS,
+            questions:
+              [
+                {
+                  question:
+                    firstQuestion,
+                },
+              ],
+            startedAt:
+              new Date(),
           }
         );
 
       return res
         .status(201)
         .json({
-          success: true,
+          success:
+            true,
           sessionId:
             session._id,
           firstQuestion,
         });
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
-        "Start Interview Error FULL:",
-        error
+        "Start Interview Error:",
+        error.message
       );
 
       return res
         .status(500)
         .json({
-          success: false,
+          success:
+            false,
           message:
-            error.message ||
-            "Failed to start interview",
-          stack:
-            process.env
-              .NODE_ENV ===
-            "development"
-              ? error.stack
-              : null,
+            error.message,
         });
     }
   };
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 | Submit Answer
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 */
+
 const submitAnswer =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     try {
+      const userId =
+        req.user._id;
+
       const {
-        sessionId,
         question,
         answer,
-      } = req.body;
+      } =
+        req.body;
+
+      const {
+        sessionId,
+      } =
+        req.params;
 
       const session =
-        await InterviewSession.findById(
-          sessionId
+        await InterviewSession.findOne(
+          {
+            _id:
+              sessionId,
+            user:
+              userId,
+          }
         );
 
-      if (!session) {
+      if (
+        !session
+      ) {
         return res
           .status(404)
           .json({
-            success: false,
+            success:
+              false,
             message:
               "Session not found",
           });
@@ -199,38 +244,17 @@ const submitAnswer =
 
       const finalAnswer =
         answer?.trim() ||
-        "I don't know";
+        "No answer provided";
 
-      const evaluationRaw =
+      const evaluation =
         await evaluateAnswer(
           question,
           finalAnswer
         );
 
-      let evaluation =
-        parseJSONSafely(
-          evaluationRaw
-        );
-
-      if (!evaluation) {
-        evaluation = {
-          score: 0,
-          feedback:
-            typeof evaluationRaw ===
-            "string"
-              ? evaluationRaw
-              : "Response recorded.",
-          weaknesses:
-            [],
-          followUpQuestion:
-            "",
-          isWeak: true,
-        };
-      }
-
       const lastIndex =
-        session.questions
-          .length - 1;
+        session.questions.length -
+        1;
 
       session.questions[
         lastIndex
@@ -240,17 +264,15 @@ const submitAnswer =
       session.questions[
         lastIndex
       ].feedback =
-        String(
-          evaluation.feedback ||
-            "Processed"
-        );
+        evaluation.feedback;
 
       session.questions[
         lastIndex
-      ].score = Number(
-        evaluation.score ||
-          0
-      );
+      ].score =
+        Number(
+          evaluation.score ||
+            0
+        );
 
       session.totalScore +=
         Number(
@@ -263,10 +285,40 @@ const submitAnswer =
           evaluation.weaknesses
         )
       ) {
-        session.weaknesses.push(
-          ...evaluation.weaknesses
-        );
+        session.weaknesses =
+          [
+            ...new Set(
+              [
+                ...session.weaknesses,
+                ...evaluation.weaknesses,
+              ]
+            ),
+          ];
       }
+
+      if (
+        Array.isArray(
+          evaluation.strengths
+        )
+      ) {
+        session.strengths =
+          [
+            ...new Set(
+              [
+                ...session.strengths,
+                ...evaluation.strengths,
+              ]
+            ),
+          ];
+      }
+
+      session.analytics =
+        session.analytics ||
+        {};
+
+      session.analytics.averageScore =
+        session.totalScore /
+        session.currentLevel;
 
       if (
         session.currentLevel >=
@@ -275,60 +327,74 @@ const submitAnswer =
         session.status =
           "completed";
 
+        session.endedAt =
+          new Date();
+
+        session.durationInMinutes =
+          Math.ceil(
+            (session.endedAt -
+              session.startedAt) /
+              60000
+          );
+
+        await User.findByIdAndUpdate(
+          userId,
+          {
+            $inc: {
+              interviewCount:
+                1,
+            },
+          }
+        );
+
         await session.save();
 
         return res
           .status(200)
           .json({
-            success: true,
-            completed: true,
+            success:
+              true,
+            completed:
+              true,
             evaluation,
           });
       }
 
-      session.currentLevel += 1;
+      session.currentLevel +=
+        1;
 
-      let nextQuestion;
+      let nextDomain =
+        session.domain;
 
       if (
-        evaluation.followUpQuestion &&
-        evaluation.isWeak
+        session.domain ===
+        "Complete Interview"
       ) {
-        nextQuestion =
-          evaluation.followUpQuestion;
-      } else {
-        let nextDomain =
-          session.domain;
+        const domainIndex =
+          (session.currentLevel -
+            1) %
+          fullInterviewDomains.length;
 
-        if (
-          session.domain ===
-          "Complete Interview"
-        ) {
-          const domainIndex =
-            (session.currentLevel -
-              1) %
-            fullInterviewDomains.length;
+        nextDomain =
+          fullInterviewDomains[
+            domainIndex
+          ];
 
-          nextDomain =
-            fullInterviewDomains[
-              domainIndex
-            ];
-        }
-
-        nextQuestion =
-          await generateInterviewQuestion(
-            nextDomain,
-            session.resume.toString()
-          );
+        session.domainHistory.push(
+          nextDomain
+        );
       }
+
+      const nextQuestion =
+        await generateInterviewQuestion(
+          nextDomain,
+          session.resume.toString()
+        );
 
       session.questions.push(
         {
           question:
             nextQuestion,
-          answer: "",
-          feedback: "",
-          score: 0,
         }
       );
 
@@ -337,23 +403,28 @@ const submitAnswer =
       return res
         .status(200)
         .json({
-          success: true,
-          completed: false,
+          success:
+            true,
+          completed:
+            false,
           evaluation,
           nextQuestion,
           currentLevel:
             session.currentLevel,
         });
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
-        "Submit Answer Error FULL:",
-        error
+        "Submit Answer Error:",
+        error.message
       );
 
       return res
         .status(500)
         .json({
-          success: false,
+          success:
+            false,
           message:
             error.message,
         });
@@ -361,28 +432,48 @@ const submitAnswer =
   };
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 | Interview Report
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 */
+
 const getInterviewReport =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     try {
+      const userId =
+        req.user._id;
+
       const session =
-        await InterviewSession.findById(
-          req.params.sessionId
+        await InterviewSession.findOne(
+          {
+            _id:
+              req.params
+                .sessionId,
+            user:
+              userId,
+          }
         )
-          .populate("user")
-          .populate("resume")
+          .populate(
+            "user"
+          )
+          .populate(
+            "resume"
+          )
           .populate(
             "jobDescription"
           );
 
-      if (!session) {
+      if (
+        !session
+      ) {
         return res
           .status(404)
           .json({
-            success: false,
+            success:
+              false,
             message:
               "Report not found",
           });
@@ -391,19 +482,16 @@ const getInterviewReport =
       return res
         .status(200)
         .json({
-          success: true,
+          success:
+            true,
           session,
         });
-    } catch (error) {
-      console.error(
-        "Report Error:",
-        error
-      );
-
+    } catch {
       return res
         .status(500)
         .json({
-          success: false,
+          success:
+            false,
           message:
             "Failed to fetch report",
         });
@@ -411,77 +499,78 @@ const getInterviewReport =
   };
 
 /*
-|--------------------------------------------------------------------------
-| Revision Plan
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
+| Generate Revision Plan
+|---------------------------------------------------------
 */
+
 const generateRevisionPlan =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     try {
+      const userId =
+        req.user._id;
+
       const session =
-        await InterviewSession.findById(
-          req.params.sessionId
+        await InterviewSession.findOne(
+          {
+            _id:
+              req.params
+                .sessionId,
+            user:
+              userId,
+          }
         );
 
-      if (!session) {
+      if (
+        !session
+      ) {
         return res
           .status(404)
           .json({
-            success: false,
+            success:
+              false,
             message:
               "Session not found",
           });
       }
 
-      const uniqueWeaknesses =
-        [
-          ...new Set(
-            session.weaknesses
-          ),
-        ];
-
-      const planRaw =
+      const plan =
         await generatePlan(
-          uniqueWeaknesses
+          session.weaknesses
         );
 
-      const parsedPlan =
-        parseJSONSafely(
-          planRaw
-        );
+      session.revisionPlan =
+        plan;
+
+      await session.save();
 
       return res
         .status(200)
         .json({
-          success: true,
+          success:
+            true,
           revisionPlan:
-            parsedPlan || {
-              priorityTopics:
-                [],
-              actionPlan:
-                [],
-              estimatedDays: 7,
-            },
+            plan,
         });
-    } catch (error) {
-      console.error(
-        "Revision Plan Error:",
-        error
-      );
-
+    } catch {
       return res
         .status(500)
         .json({
-          success: false,
+          success:
+            false,
           message:
-            "Failed to generate plan",
+            "Failed to generate revision plan",
         });
     }
   };
 
-module.exports = {
-  startInterview,
-  submitAnswer,
-  getInterviewReport,
-  generateRevisionPlan,
-};
+module.exports =
+  {
+    startInterview,
+    submitAnswer,
+    getInterviewReport,
+    generateRevisionPlan,
+  };

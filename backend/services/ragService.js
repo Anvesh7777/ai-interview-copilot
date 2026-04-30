@@ -1,124 +1,362 @@
-const { Chroma } = require("@langchain/community/vectorstores/chroma");
-const embeddings = require("./embeddingService");
-const { groq, MODEL } = require("../config/groq");
-const redis = require("../config/redis");
+const {
+  Chroma,
+} = require(
+  "@langchain/community/vectorstores/chroma"
+);
 
-// Ensure URL doesn't have a trailing slash which can cause 404s on some API calls
-const CHROMA_URL = process.env.CHROMA_URL?.replace(/\/$/, "") || "http://localhost:8000";
-const COLLECTION_NAME = "resume_chunks";
+const embeddings =
+  require(
+    "./embeddingService"
+  );
 
-/**
- * Store Resume Embeddings
- * Logic Check: Using fromTexts is correct for initial uploads. 
- * Added logging to track chunk counts and metadata types.
- */
-const storeResumeEmbeddings = async (chunks, resumeId) => {
-  console.log(`[RAG_SERVICE] Starting storage for Resume: ${resumeId} (${chunks?.length} chunks)`);
-  
-  try {
-    if (!chunks || chunks.length === 0) {
-      throw new Error("No chunks provided for embedding.");
-    }
+const {
+  groq,
+  MODEL,
+} = require(
+  "../config/groq"
+);
 
-    await Chroma.fromTexts(
-      chunks,
-      chunks.map((_, index) => ({
-        resumeId: String(resumeId), // Ensure string for consistent filtering
-        chunkIndex: index,
-      })),
-      embeddings,
-      {
-        collectionName: COLLECTION_NAME,
-        url: CHROMA_URL,
-        // Optional: tenant and database are usually default_tenant/default_database
-        // Adding them only if explicitly required by your Chroma setup
-      }
-    );
+const redis =
+  require(
+    "../config/redis"
+);
 
-    console.log(`[RAG_SERVICE] Embeddings successfully stored in Chroma ✅`);
-  } catch (error) {
-    console.error("[RAG_SERVICE_ERROR] Chroma Store Failure:", error.message);
-    throw error;
-  }
-};
+const CHROMA_URL =
+  process.env.CHROMA_URL?.replace(
+    /\/$/,
+    ""
+  ) ||
+  "http://localhost:8000";
 
-/**
- * Generate Interview Question
- * Logic Check: 
- * 1. Fixed Cache Key (removed Date.now() so it actually caches).
- * 2. Added context check.
- * 3. Added fallback response.
- */
-const generateInterviewQuestion = async (domain, resumeId) => {
-  console.log(`[RAG_SERVICE] Generating question. Domain: ${domain}, ResumeID: ${resumeId}`);
+const COLLECTION_NAME =
+  "resume_chunks";
 
-  try {
-    // FIX: Remove Date.now() from cache key to enable actual caching
-    const sanitizedDomain = domain.toLowerCase().replace(/\s+/g, "_");
-    const cacheKey = `question:${resumeId}:${sanitizedDomain}`;
+/*
+|---------------------------------------------------------
+| Get Existing Chroma Collection
+|---------------------------------------------------------
+*/
 
-    // 1. Check Redis
+const getVectorStore =
+  async () => {
     try {
-      const cached = await redis.get(cacheKey);
-      if (cached) {
-        console.log(`[RAG_SERVICE] Cache Hit 🎯`);
+      return new Chroma(
+        embeddings,
+        {
+          collectionName:
+            COLLECTION_NAME,
+
+          url:
+            CHROMA_URL,
+        }
+      );
+    } catch (
+      error
+    ) {
+      console.error(
+        "[RAG] VectorStore Error:",
+        error.message
+      );
+
+      throw error;
+    }
+  };
+
+/*
+|---------------------------------------------------------
+| Store Resume Embeddings
+|---------------------------------------------------------
+*/
+
+const storeResumeEmbeddings =
+  async (
+    chunks,
+    resumeId
+  ) => {
+    try {
+      if (
+        !chunks ||
+        !chunks.length
+      ) {
+        throw new Error(
+          "No chunks provided."
+        );
+      }
+
+      console.log(
+        `[RAG] Storing ${chunks.length} chunks for resume ${resumeId}`
+      );
+
+      await Chroma.fromTexts(
+        chunks,
+        chunks.map(
+          (
+            _,
+            index
+          ) => ({
+            resumeId:
+              String(
+                resumeId
+              ),
+            chunkIndex:
+              index,
+            chunkType:
+              "resume",
+          })
+        ),
+        embeddings,
+        {
+          collectionName:
+            COLLECTION_NAME,
+
+          url:
+            CHROMA_URL,
+        }
+      );
+
+      console.log(
+        "[RAG] Embeddings stored ✅"
+      );
+    } catch (
+      error
+    ) {
+      console.error(
+        "[RAG] Store Error:",
+        error.message
+      );
+
+      throw error;
+    }
+  };
+
+/*
+|---------------------------------------------------------
+| Duplicate Question Check
+|---------------------------------------------------------
+*/
+
+const isDuplicateQuestion =
+  async (
+    resumeId,
+    question
+  ) => {
+    try {
+      const key =
+        `asked:${resumeId}`;
+
+      const existing =
+        await redis.lrange(
+          key,
+          0,
+          -1
+        );
+
+      return existing.includes(
+        question
+      );
+    } catch {
+      return false;
+    }
+  };
+
+const saveQuestionMemory =
+  async (
+    resumeId,
+    question
+  ) => {
+    try {
+      const key =
+        `asked:${resumeId}`;
+
+      await redis.rpush(
+        key,
+        question
+      );
+
+      await redis.expire(
+        key,
+        86400
+      );
+    } catch {
+      console.log(
+        "[RAG] Redis save skipped"
+      );
+    }
+  };
+
+/*
+|---------------------------------------------------------
+| Generate Interview Question
+|---------------------------------------------------------
+*/
+
+const generateInterviewQuestion =
+  async (
+    domain,
+    resumeId
+  ) => {
+    try {
+      const normalizedDomain =
+        domain
+          .trim()
+          .toLowerCase();
+
+      const cacheKey =
+        `question:${resumeId}:${normalizedDomain}`;
+
+      const cached =
+        await redis
+          .get(
+            cacheKey
+          )
+          .catch(
+            () => null
+          );
+
+      if (
+        cached
+      ) {
+        console.log(
+          "[RAG] Cache hit 🎯"
+        );
+
         return cached;
       }
-    } catch (redisErr) {
-      console.warn("[RAG_SERVICE] Redis unavailable, skipping cache.");
-    }
 
-    // 2. Fetch from Chroma
-    console.log(`[RAG_SERVICE] Querying Chroma at ${CHROMA_URL}...`);
-    const vectorStore = await Chroma.fromExistingCollection(embeddings, {
-      collectionName: COLLECTION_NAME,
-      url: CHROMA_URL,
-    });
+      const vectorStore =
+        await getVectorStore();
 
-    const docs = await vectorStore.similaritySearch(domain, 3, {
-      resumeId: String(resumeId),
-    });
+      const docs =
+        await vectorStore.similaritySearch(
+          normalizedDomain,
+          3,
+          {
+            resumeId:
+              String(
+                resumeId
+              ),
+          }
+        );
 
-    console.log(`[RAG_SERVICE] Found ${docs.length} relevant chunks.`);
+      console.log(
+        `[RAG] Retrieved ${docs.length} chunks`
+      );
 
-    const context = docs.length > 0
-      ? docs.map((doc) => doc.pageContent).join("\n")
-      : "No specific resume context found for this domain.";
+      const context =
+        docs.length > 0
+          ? docs
+              .map(
+                (
+                  doc
+                ) =>
+                  doc.pageContent
+              )
+              .join(
+                "\n"
+              )
+          : "No relevant resume context found.";
 
-    // 3. Groq AI Call
-    const prompt = `
+      const prompt = `
 You are an expert technical interviewer.
-Candidate Resume Context: ${context}
-Interview Domain: ${domain}
 
-Task: Generate ONE strong technical interview question.
-Rules: Must be domain-specific, practical, and technical. Return ONLY the question text.`;
+Candidate Resume Context:
+${context}
 
-    const response = await groq.chat.completions.create({
-      model: MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-    });
+Interview Domain:
+${domain}
 
-    const question = response.choices?.[0]?.message?.content?.trim();
+Generate ONE technical interview question.
 
-    if (!question) throw new Error("Groq returned empty content.");
+Rules:
+1. Domain-specific
+2. Resume-specific if possible
+3. Project-based preferred
+4. Practical
+5. No explanation
+6. Return only the question
+`;
 
-    // 4. Update Cache
-    await redis.set(cacheKey, question, "EX", 3600).catch(() => {});
+      const response =
+        await groq.chat.completions.create(
+          {
+            model:
+              MODEL,
+            messages:
+              [
+                {
+                  role:
+                    "user",
+                  content:
+                    prompt,
+                },
+              ],
+            temperature:
+              0.7,
+          }
+        );
 
-    console.log(`[RAG_SERVICE] Question generated successfully ✅`);
-    return question;
+      const question =
+        response
+          .choices?.[0]
+          ?.message
+          ?.content
+          ?.trim();
 
-  } catch (error) {
-    console.error("[RAG_SERVICE_ERROR] Generation failed:", error.message);
-    
-    // Safety Fallback: Don't let the interview crash
-    return `Can you explain your experience and best practices when working with ${domain}?`;
-  }
-};
+      if (
+        !question
+      ) {
+        throw new Error(
+          "Question generation failed"
+        );
+      }
 
-module.exports = {
-  storeResumeEmbeddings,
-  generateInterviewQuestion,
-};
+      const duplicate =
+        await isDuplicateQuestion(
+          resumeId,
+          question
+        );
+
+      if (
+        duplicate
+      ) {
+        return `Can you explain your real-world implementation experience in ${domain}?`;
+      }
+
+      await saveQuestionMemory(
+        resumeId,
+        question
+      );
+
+      await redis
+        .set(
+          cacheKey,
+          question,
+          "EX",
+          3600
+        )
+        .catch(
+          () => {}
+        );
+
+      console.log(
+        "[RAG] Question generated ✅"
+      );
+
+      return question;
+    } catch (
+      error
+    ) {
+      console.error(
+        "[RAG] Generate Error:",
+        error.message
+      );
+
+      return `Can you explain your experience with ${domain}?`;
+    }
+  };
+
+module.exports =
+  {
+    storeResumeEmbeddings,
+    generateInterviewQuestion,
+  };

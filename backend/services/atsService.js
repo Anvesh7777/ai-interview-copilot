@@ -1,51 +1,220 @@
-const Groq = require("groq-sdk");
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const Groq =
+  require(
+    "groq-sdk"
+  );
 
-const analyzeATS = async (resumeText, jdText) => {
-  try {
-    const isGeneric = !jdText || jdText.includes("General Software Engineering Industry Standards");
+const redis = require(
+  "../config/redis"
+);
 
-    const completion = await groq.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content: `You are a professional ATS Intelligence Engine. 
-          Your goal is to provide a realistic match score. 
-          If a Job Description (JD) is provided, score based on Keyword Match. 
-          If a JD is NOT provided, score based on Resume Quality (Formatting, Impactful Verbs, Tech Stack Density, and Quantifiable Achievements).`,
-        },
-        {
-          role: "user",
-          content: `
-          --- SCORING RUBRIC (WHEN JD IS MISSING) ---
-          1. Professional Summary & Contact: 10%
-          2. Tech Stack Density (Languages, Frameworks): 30%
-          3. Quantifiable Impact (Used %, Improved X, Built Y): 40%
-          4. Formatting & Structure (Sections present): 20%
+const groq =
+  new Groq({
+    apiKey:
+      process.env
+        .GROQ_API_KEY,
+  });
 
-          --- INPUT DATA ---
-          RESUME: ${resumeText}
-          JD: ${isGeneric ? "NONE PROVIDED (Perform General Quality Audit)" : jdText}
+/*
+|---------------------------------------------------------
+| Analyze ATS
+|---------------------------------------------------------
+*/
 
-          Return ONLY this JSON structure:
+const analyzeATS =
+  async (
+    resumeText,
+    jdText = ""
+  ) => {
+    try {
+      const cacheKey =
+        `ats:${Buffer.from(
+          resumeText +
+            jdText
+        ).toString(
+          "base64"
+        )}`;
+
+      /*
+      |---------------------------------------------
+      | Cache Check
+      |---------------------------------------------
+      */
+
+      const cached =
+        await redis
+          .get(
+            cacheKey
+          )
+          .catch(
+            () => null
+          );
+
+      if (
+        cached
+      ) {
+        console.log(
+          "Serving ATS from cache ⚡"
+        );
+
+        return JSON.parse(
+          cached
+        );
+      }
+
+      const isGeneric =
+        !jdText ||
+        jdText.includes(
+          "General Software Engineering Industry Standards"
+        );
+
+      /*
+      |---------------------------------------------
+      | Prompt
+      |---------------------------------------------
+      */
+
+      const completion =
+        await groq.chat.completions.create(
           {
-            "matchScore": number (0-100),
-            "matchedSkills": ["extracted tech skills found"],
-            "missingSkills": ["suggest keywords common in target roles"],
-            "suggestions": ["syntax/formatting/impact tips if JD is missing, else keyword tips"]
-          }`,
-        },
-      ],
-      model: "llama-3.3-70b-versatile",
-      response_format: { type: "json_object" },
-      temperature: 0.2, 
-    });
+            messages:
+              [
+                {
+                  role:
+                    "system",
+                  content: `
+You are a professional ATS Intelligence Engine.
 
-    return completion.choices[0].message.content;
-  } catch (error) {
-    console.error("Groq Service Error:", error);
-    throw new Error("AI Analysis Failed");
-  }
-};
+Analyze the resume and compare it against the job description.
 
-module.exports = analyzeATS;
+Return ONLY valid JSON.
+`,
+                },
+                {
+                  role:
+                    "user",
+                  content: `
+Resume:
+${resumeText}
+
+Job Description:
+${
+  isGeneric
+    ? "Not Provided"
+    : jdText
+}
+
+Return JSON:
+{
+  "matchScore": 0,
+  "matchedSkills": [],
+  "missingSkills": [],
+  "strengths": [],
+  "weaknesses": [],
+  "suggestions": [],
+  "roleFit": ""
+}
+`,
+                },
+              ],
+            model:
+              "llama-3.3-70b-versatile",
+            response_format:
+              {
+                type:
+                  "json_object",
+              },
+            temperature:
+              0.2,
+          }
+        );
+
+      let raw =
+        completion
+          .choices?.[0]
+          ?.message
+          ?.content
+          ?.trim();
+
+      if (
+        !raw
+      ) {
+        throw new Error(
+          "Empty ATS response."
+        );
+      }
+
+      let report;
+
+      try {
+        report =
+          JSON.parse(
+            raw
+          );
+      } catch {
+        report = {
+          matchScore:
+            50,
+          matchedSkills:
+            [],
+          missingSkills:
+            [],
+          strengths:
+            [],
+          weaknesses:
+            [],
+          suggestions:
+            [],
+          roleFit:
+            "Average",
+        };
+      }
+
+      /*
+      |---------------------------------------------
+      | Cache Save
+      |---------------------------------------------
+      */
+
+      await redis
+        .set(
+          cacheKey,
+          JSON.stringify(
+            report
+          ),
+          "EX",
+          86400
+        )
+        .catch(
+          () => {}
+        );
+
+      return report;
+    } catch (
+      error
+    ) {
+      console.error(
+        "ATS Service Error:",
+        error.message
+      );
+
+      return {
+        matchScore:
+          50,
+        matchedSkills:
+          [],
+        missingSkills:
+          [],
+        strengths:
+          [],
+        weaknesses:
+          [],
+        suggestions:
+          [],
+        roleFit:
+          "Unknown",
+      };
+    }
+  };
+
+module.exports =
+  analyzeATS;

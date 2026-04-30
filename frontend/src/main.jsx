@@ -1,6 +1,9 @@
 import React from "react";
+
 import ReactDOM from "react-dom/client";
+
 import App from "./App";
+
 import "./index.css";
 
 import {
@@ -16,14 +19,27 @@ import {
 } from "react-router-dom";
 
 const clientId =
-  "697862016586-trrbp8c76hmiuin7h4snjh30asdjtt8c.apps.googleusercontent.com";
+  import.meta.env
+    .VITE_GOOGLE_CLIENT_ID;
+
+if (
+  !clientId
+) {
+  throw new Error(
+    "VITE_GOOGLE_CLIENT_ID is missing"
+  );
+}
 
 ReactDOM.createRoot(
-  document.getElementById("root")
+  document.getElementById(
+    "root"
+  )
 ).render(
   <React.StrictMode>
     <GoogleOAuthProvider
-      clientId={clientId}
+      clientId={
+        clientId
+      }
     >
       <BrowserRouter>
         <AuthProvider>

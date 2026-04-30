@@ -1,6 +1,81 @@
 const mongoose =
   require("mongoose");
 
+const skillSchema =
+  new mongoose.Schema({
+    name: {
+      type: String,
+      required: true,
+    },
+    category: {
+      type: String,
+      default: "General",
+    },
+    confidence: {
+      type: Number,
+      default: 0,
+    },
+  });
+
+const projectSchema =
+  new mongoose.Schema({
+    title: {
+      type: String,
+      required: true,
+    },
+    description: {
+      type: String,
+      default: "",
+    },
+    technologies: [
+      {
+        type: String,
+      },
+    ],
+  });
+
+const atsSchema =
+  new mongoose.Schema({
+    score: {
+      type: Number,
+      default: 0,
+    },
+    matchedSkills: [
+      {
+        type: String,
+      },
+    ],
+    missingSkills: [
+      {
+        type: String,
+      },
+    ],
+    suggestions: [
+      {
+        type: String,
+      },
+    ],
+  });
+
+const interviewInsightsSchema =
+  new mongoose.Schema({
+    strongAreas: [
+      {
+        type: String,
+      },
+    ],
+    weakAreas: [
+      {
+        type: String,
+      },
+    ],
+    improvementAreas: [
+      {
+        type: String,
+      },
+    ],
+  });
+
 const resumeSchema =
   new mongoose.Schema(
     {
@@ -43,6 +118,26 @@ const resumeSchema =
       ],
 
       skills: [
+        skillSchema,
+      ],
+
+      projects: [
+        projectSchema,
+      ],
+
+      education: [
+        {
+          type: String,
+        },
+      ],
+
+      certifications: [
+        {
+          type: String,
+        },
+      ],
+
+      achievements: [
         {
           type: String,
         },
@@ -53,6 +148,12 @@ const resumeSchema =
         default:
           "Unknown",
       },
+
+      atsInsights:
+        atsSchema,
+
+      interviewInsights:
+        interviewInsightsSchema,
 
       vectorized: {
         type: Boolean,

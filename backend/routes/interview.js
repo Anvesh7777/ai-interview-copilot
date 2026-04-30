@@ -1,5 +1,7 @@
 const express =
-  require("express");
+  require(
+    "express"
+  );
 
 const router =
   express.Router();
@@ -13,23 +15,38 @@ const {
   "../controllers/interviewController"
 );
 
+const authMiddleware =
+  require(
+    "../middleware/authMiddleware"
+  );
+
+/*
+|---------------------------------------------------------
+| Interview Routes
+|---------------------------------------------------------
+*/
+
 router.post(
   "/start",
+  authMiddleware,
   startInterview
 );
 
 router.post(
-  "/answer",
+  "/:sessionId/answer",
+  authMiddleware,
   submitAnswer
 );
 
 router.get(
-  "/report/:sessionId",
+  "/:sessionId/report",
+  authMiddleware,
   getInterviewReport
 );
 
 router.get(
-  "/revision-plan/:sessionId",
+  "/:sessionId/revision-plan",
+  authMiddleware,
   generateRevisionPlan
 );
 

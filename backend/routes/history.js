@@ -1,9 +1,15 @@
-const express = require(
-  "express"
-);
+const express =
+  require(
+    "express"
+  );
 
 const router =
   express.Router();
+
+const authMiddleware =
+  require(
+    "../middleware/authMiddleware"
+  );
 
 const {
   getInterviewHistory,
@@ -11,9 +17,17 @@ const {
   "../controllers/historyController"
 );
 
+/*
+|---------------------------------------------------------
+| History Routes
+|---------------------------------------------------------
+*/
+
 router.get(
-  "/:userId",
+  "/",
+  authMiddleware,
   getInterviewHistory
 );
 
-module.exports = router;
+module.exports =
+  router;

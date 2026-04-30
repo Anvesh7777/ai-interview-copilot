@@ -1,22 +1,41 @@
-require("dotenv").config();
+require(
+  "dotenv"
+).config();
 
-const express = require("express");
-const cors = require("cors");
+const express =
+  require(
+    "express"
+  );
+
+const cors =
+  require(
+    "cors"
+  );
 
 const connectDB =
-  require("./config/db");
+  require(
+    "./config/db"
+  );
 
 const authRoutes =
-  require("./routes/auth");
+  require(
+    "./routes/auth"
+  );
 
 const resumeRoutes =
-  require("./routes/resume");
+  require(
+    "./routes/resume"
+  );
 
 const interviewRoutes =
-  require("./routes/interview");
+  require(
+    "./routes/interview"
+  );
 
 const historyRoutes =
-  require("./routes/history");
+  require(
+    "./routes/history"
+  );
 
 const jobDescriptionRoutes =
   require(
@@ -28,26 +47,64 @@ const atsRoutes =
     "./routes/ats"
   );
 
+const app =
+  express();
+
 /*
-|--------------------------------------------------------------------------
-| Connect Database
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
+| Database Connection
+|---------------------------------------------------------
 */
 
-connectDB();
+const startServer =
+  async () => {
+    try {
+      await connectDB();
 
-const app = express();
+      console.log(
+        "MongoDB connected ✅"
+      );
+
+      const PORT =
+        process.env.PORT ||
+        5000;
+
+      app.listen(
+        PORT,
+        () => {
+          console.log(
+            `Server running on port ${PORT} 🚀`
+          );
+        }
+      );
+    } catch (
+      error
+    ) {
+      console.error(
+        "Server startup failed:",
+        error.message
+      );
+
+      process.exit(
+        1
+      );
+    }
+  };
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 | CORS Configuration
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 */
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  process.env.FRONTEND_URL,
-].filter(Boolean);
+const allowedOrigins =
+  [
+    "http://localhost:5173",
+    process.env
+      .FRONTEND_URL,
+  ].filter(
+    Boolean
+  );
 
 app.use(
   cors({
@@ -55,8 +112,9 @@ app.use(
       origin,
       callback
     ) => {
-      // allow tools like Postman
-      if (!origin) {
+      if (
+        !origin
+      ) {
         return callback(
           null,
           true
@@ -76,44 +134,56 @@ app.use(
 
       return callback(
         new Error(
-          "CORS policy blocked this origin"
+          "CORS blocked this origin"
         )
       );
     },
-    credentials: true,
+    credentials:
+      true,
   })
 );
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 | Body Parsers
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 */
 
 app.use(
   express.json({
-    limit: "10mb",
+    limit:
+      "10mb",
   })
 );
 
 app.use(
-  express.urlencoded({
-    extended: true,
-    limit: "10mb",
-  })
+  express.urlencoded(
+    {
+      extended:
+        true,
+      limit:
+        "10mb",
+    }
+  )
 );
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 | Health Check
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 */
 
 app.get(
   "/",
-  (req, res) => {
-    res.status(200).json({
-      success: true,
+  (
+    req,
+    res
+  ) => {
+    res.status(
+      200
+    ).json({
+      success:
+        true,
       message:
         "AI Interview Copilot API running 🚀",
       environment:
@@ -125,9 +195,9 @@ app.get(
 );
 
 /*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
+| Routes
+|---------------------------------------------------------
 */
 
 app.use(
@@ -161,15 +231,21 @@ app.use(
 );
 
 /*
-|--------------------------------------------------------------------------
-| 404 Handler (Express 5 safe)
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
+| 404 Handler
+|---------------------------------------------------------
 */
 
 app.use(
-  (req, res) => {
-    res.status(404).json({
-      success: false,
+  (
+    req,
+    res
+  ) => {
+    res.status(
+      404
+    ).json({
+      success:
+        false,
       message:
         "Route not found",
     });
@@ -177,9 +253,9 @@ app.use(
 );
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 | Global Error Handler
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 */
 
 app.use(
@@ -195,9 +271,11 @@ app.use(
     );
 
     res.status(
-      err.status || 500
+      err.status ||
+        500
     ).json({
-      success: false,
+      success:
+        false,
       message:
         err.message ||
         "Internal Server Error",
@@ -206,20 +284,43 @@ app.use(
 );
 
 /*
-|--------------------------------------------------------------------------
-| Start Server
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
+| Process-Level Error Handling
+|---------------------------------------------------------
 */
 
-const PORT =
-  process.env.PORT ||
-  5000;
-
-app.listen(
-  PORT,
-  () => {
-    console.log(
-      `Server running on port ${PORT} 🚀`
+process.on(
+  "unhandledRejection",
+  (
+    error
+  ) => {
+    console.error(
+      "Unhandled Rejection:",
+      error.message
     );
   }
 );
+
+process.on(
+  "uncaughtException",
+  (
+    error
+  ) => {
+    console.error(
+      "Uncaught Exception:",
+      error.message
+    );
+
+    process.exit(
+      1
+    );
+  }
+);
+
+/*
+|---------------------------------------------------------
+| Start Server
+|---------------------------------------------------------
+*/
+
+startServer();

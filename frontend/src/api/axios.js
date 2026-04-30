@@ -1,61 +1,98 @@
 import axios from "axios";
 
-const api = axios.create({
-  baseURL:
-    import.meta.env
-      .VITE_API_URL ||
-    "http://localhost:5000/api",
+const api =
+  axios.create({
+    baseURL:
+      import.meta.env
+        .VITE_API_URL ||
+      "http://localhost:5000/api",
 
-  withCredentials: true,
-});
+    withCredentials:
+      true,
+
+    timeout:
+      30000,
+
+    headers: {
+      "Content-Type":
+        "application/json",
+    },
+  });
 
 /*
-|----------------------------------------
-| Attach token automatically
-|----------------------------------------
+|---------------------------------------------------------
+| Request Interceptor
+|---------------------------------------------------------
 */
 
 api.interceptors.request.use(
-  (config) => {
+  (
+    config
+  ) => {
     const token =
       localStorage.getItem(
         "token"
       );
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (
+      token
+    ) {
+      config.headers.Authorization =
+        `Bearer ${token}`;
     }
 
     return config;
   },
 
-  (error) =>
+  (
+    error
+  ) =>
     Promise.reject(
       error
     )
 );
 
 /*
-|----------------------------------------
-| Global response handling
-|----------------------------------------
+|---------------------------------------------------------
+| Response Interceptor
+|---------------------------------------------------------
 */
 
 api.interceptors.response.use(
-  (response) =>
+  (
+    response
+  ) =>
     response,
 
-  (error) => {
-    if (
+  (
+    error
+  ) => {
+    const status =
       error.response
-        ?.status ===
+        ?.status;
+
+    if (
+      status ===
       401
     ) {
-      localStorage.clear();
+      localStorage.removeItem(
+        "token"
+      );
+
+      localStorage.removeItem(
+        "user"
+      );
 
       window.location.href =
-        "/";
+        "/login";
     }
+
+    console.error(
+      "API Error:",
+      error.response
+        ?.data ||
+        error.message
+    );
 
     return Promise.reject(
       error
