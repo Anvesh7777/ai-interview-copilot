@@ -16,7 +16,8 @@ const {
 );
 
 const redis = require(
-  "../config/redis");
+  "../config/redis"
+);
 
 const CHROMA_URL =
   process.env.CHROMA_URL ||
@@ -58,7 +59,9 @@ const storeResumeEmbeddings =
         chunks,
         chunks.map(
           (_, index) => ({
-            resumeId,
+            resumeId: String(
+              resumeId
+            ),
             chunkIndex:
               index,
           })
@@ -113,7 +116,9 @@ const generateInterviewQuestion =
       }
 
       const cacheKey =
-        `question:${resumeId}:${domain}:${Date.now()}`;
+        `question:${String(
+          resumeId
+        )}:${domain}:${Date.now()}`;
 
       const vectorStore =
         new Chroma(
@@ -134,7 +139,9 @@ const generateInterviewQuestion =
         vectorStore.asRetriever({
           k: 3,
           filter: {
-            resumeId,
+            resumeId: String(
+              resumeId
+            ),
           },
         });
 
