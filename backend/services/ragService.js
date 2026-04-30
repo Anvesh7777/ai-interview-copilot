@@ -23,11 +23,6 @@ const CHROMA_URL =
   process.env.CHROMA_URL ||
   "http://localhost:8000";
 
-const CHROMA_HOST =
-  CHROMA_URL
-    .replace("https://", "")
-    .replace("http://", "");
-
 const COLLECTION_NAME =
   "resume_chunks";
 
@@ -75,10 +70,8 @@ const storeResumeEmbeddings =
         {
           collectionName:
             COLLECTION_NAME,
-          host:
-            CHROMA_HOST,
-          port: 443,
-          ssl: true,
+          url:
+            CHROMA_URL,
           tenant:
             TENANT,
           database:
@@ -92,7 +85,7 @@ const storeResumeEmbeddings =
     } catch (error) {
       console.error(
         "Chroma Store Error:",
-        error.message
+        error
       );
       throw error;
     }
@@ -133,10 +126,8 @@ const generateInterviewQuestion =
           {
             collectionName:
               COLLECTION_NAME,
-            host:
-              CHROMA_HOST,
-            port: 443,
-            ssl: true,
+            url:
+              CHROMA_URL,
             tenant:
               TENANT,
             database:
@@ -178,6 +169,7 @@ ${context}
 Interview Domain:
 ${domain}
 
+Task:
 Generate ONE strong technical interview question.
 
 Rules:
@@ -206,9 +198,15 @@ Rules:
 
       const question =
         response
-          .choices[0]
-          .message.content
-          .trim();
+          .choices?.[0]
+          ?.message?.content
+          ?.trim();
+
+      if (!question) {
+        throw new Error(
+          "No question generated from Groq."
+        );
+      }
 
       await redis.set(
         cacheKey,
@@ -225,7 +223,7 @@ Rules:
     } catch (error) {
       console.error(
         "Question Generation Error:",
-        error.message
+        error
       );
       throw error;
     }
