@@ -19,10 +19,6 @@ const redis = require(
   "../config/redis"
 );
 
-const CHROMA_URL =
-  process.env.CHROMA_URL ||
-  "http://localhost:8000";
-
 const COLLECTION_NAME =
   "resume_chunks";
 
@@ -33,6 +29,9 @@ const TENANT =
 const DATABASE =
   process.env.CHROMA_DATABASE ||
   "default_database";
+
+const CHROMA_HOST =
+  "ai-interview-chroma.onrender.com";
 
 /*
 |---------------------------------------------------------
@@ -70,8 +69,9 @@ const storeResumeEmbeddings =
         {
           collectionName:
             COLLECTION_NAME,
-          url:
-            CHROMA_URL,
+          host:
+            CHROMA_HOST,
+          ssl: true,
           tenant:
             TENANT,
           database:
@@ -126,8 +126,9 @@ const generateInterviewQuestion =
           {
             collectionName:
               COLLECTION_NAME,
-            url:
-              CHROMA_URL,
+            host:
+              CHROMA_HOST,
+            ssl: true,
             tenant:
               TENANT,
             database:
@@ -169,20 +170,8 @@ ${context}
 Interview Domain:
 ${domain}
 
-Task:
-Generate ONE strong interview question.
-
-Rules:
-1. Must be domain-specific
-2. Must be practical
-3. Must be technical
-4. Must be non-generic
-5. Must be different from previous questions
-6. Prefer resume-based questions if relevant
-7. Return only plain question text
-8. No numbering
-9. No markdown
-10. No explanation
+Generate ONE strong technical interview question.
+Return only the question.
 `;
 
       const response =
