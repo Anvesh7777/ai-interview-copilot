@@ -16,8 +16,7 @@ const {
 );
 
 const redis = require(
-  "../config/redis"
-);
+  "../config/redis");
 
 const CHROMA_URL =
   process.env.CHROMA_URL ||
@@ -26,10 +25,18 @@ const CHROMA_URL =
 const COLLECTION_NAME =
   "resume_chunks";
 
+const TENANT =
+  process.env.CHROMA_TENANT ||
+  "default_tenant";
+
+const DATABASE =
+  process.env.CHROMA_DATABASE ||
+  "default_database";
+
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 | Store Resume Embeddings
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 */
 
 const storeResumeEmbeddings =
@@ -62,6 +69,10 @@ const storeResumeEmbeddings =
             COLLECTION_NAME,
           url:
             CHROMA_URL,
+          tenant:
+            TENANT,
+          database:
+            DATABASE,
         }
       );
 
@@ -73,15 +84,14 @@ const storeResumeEmbeddings =
         "Chroma Store Error:",
         error.message
       );
-
       throw error;
     }
   };
 
 /*
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 | Generate Interview Question
-|--------------------------------------------------------------------------
+|---------------------------------------------------------
 */
 
 const generateInterviewQuestion =
@@ -102,12 +112,6 @@ const generateInterviewQuestion =
         );
       }
 
-      /*
-      IMPORTANT:
-      Added timestamp in cache key
-      so every question is fresh.
-      */
-
       const cacheKey =
         `question:${resumeId}:${domain}:${Date.now()}`;
 
@@ -119,6 +123,10 @@ const generateInterviewQuestion =
               COLLECTION_NAME,
             url:
               CHROMA_URL,
+            tenant:
+              TENANT,
+            database:
+              DATABASE,
           }
         );
 
@@ -209,7 +217,6 @@ Rules:
         "Question Generation Error:",
         error.message
       );
-
       throw error;
     }
   };
