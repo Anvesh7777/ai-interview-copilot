@@ -11,7 +11,7 @@ const api =
       true,
 
     timeout:
-      30000,
+      90000,
 
     headers: {
       "Content-Type":
