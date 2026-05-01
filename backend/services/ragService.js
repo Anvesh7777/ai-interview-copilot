@@ -13,13 +13,13 @@ const {
   groq,
   MODEL,
 } = require(
-  "../config/groq"
-);
+    "../config/groq"
+  );
 
 const redis =
   require(
     "../config/redis"
-);
+  );
 
 const CHROMA_URL =
   process.env.CHROMA_URL?.replace(
@@ -45,7 +45,6 @@ const getVectorStore =
         {
           collectionName:
             COLLECTION_NAME,
-
           url:
             CHROMA_URL,
         }
@@ -57,7 +56,6 @@ const getVectorStore =
         "[RAG] VectorStore Error:",
         error.message
       );
-
       throw error;
     }
   };
@@ -108,7 +106,6 @@ const storeResumeEmbeddings =
         {
           collectionName:
             COLLECTION_NAME,
-
           url:
             CHROMA_URL,
         }
@@ -124,16 +121,33 @@ const storeResumeEmbeddings =
         "[RAG] Store Error:",
         error.message
       );
-
       throw error;
     }
   };
 
 /*
 |---------------------------------------------------------
-| Duplicate Question Check
+| Redis Question Memory
 |---------------------------------------------------------
 */
+
+const getPreviousQuestions =
+  async (
+    resumeId
+  ) => {
+    try {
+      const key =
+        `asked:${resumeId}`;
+
+      return await redis.lrange(
+        key,
+        0,
+        -1
+      );
+    } catch {
+      return [];
+    }
+  };
 
 const isDuplicateQuestion =
   async (
@@ -141,17 +155,12 @@ const isDuplicateQuestion =
     question
   ) => {
     try {
-      const key =
-        `asked:${resumeId}`;
-
-      const existing =
-        await redis.lrange(
-          key,
-          0,
-          -1
+      const previousQuestions =
+        await getPreviousQuestions(
+          resumeId
         );
 
-      return existing.includes(
+      return previousQuestions.includes(
         question
       );
     } catch {
@@ -201,28 +210,6 @@ const generateInterviewQuestion =
           .trim()
           .toLowerCase();
 
-      const cacheKey =
-        `question:${resumeId}:${normalizedDomain}`;
-
-      const cached =
-        await redis
-          .get(
-            cacheKey
-          )
-          .catch(
-            () => null
-          );
-
-      if (
-        cached
-      ) {
-        console.log(
-          "[RAG] Cache hit 🎯"
-        );
-
-        return cached;
-      }
-
       const vectorStore =
         await getVectorStore();
 
@@ -256,6 +243,11 @@ const generateInterviewQuestion =
               )
           : "No relevant resume context found.";
 
+      const previousQuestions =
+        await getPreviousQuestions(
+          resumeId
+        );
+
       const prompt = `
 You are an expert technical interviewer.
 
@@ -265,6 +257,15 @@ ${context}
 Interview Domain:
 ${domain}
 
+Previous Questions:
+${
+  previousQuestions.length
+    ? previousQuestions.join(
+        "\n"
+      )
+    : "None"
+}
+
 Generate ONE technical interview question.
 
 Rules:
@@ -272,8 +273,9 @@ Rules:
 2. Resume-specific if possible
 3. Project-based preferred
 4. Practical
-5. No explanation
-6. Return only the question
+5. Do NOT repeat previous questions
+6. Increase difficulty gradually
+7. Return only the question
 `;
 
       const response =
@@ -291,7 +293,7 @@ Rules:
                 },
               ],
             temperature:
-              0.7,
+              0.9,
           }
         );
 
@@ -319,24 +321,13 @@ Rules:
       if (
         duplicate
       ) {
-        return `Can you explain your real-world implementation experience in ${domain}?`;
+        return `Can you explain a real-world implementation challenge you faced in ${domain}?`;
       }
 
       await saveQuestionMemory(
         resumeId,
         question
       );
-
-      await redis
-        .set(
-          cacheKey,
-          question,
-          "EX",
-          3600
-        )
-        .catch(
-          () => {}
-        );
 
       console.log(
         "[RAG] Question generated ✅"
