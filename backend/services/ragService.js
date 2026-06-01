@@ -291,7 +291,14 @@ const generateInterviewQuestion =
           resumeId
         );
 
-      const prompt = `
+      let question = null;
+
+      for (
+        let attempt = 1;
+        attempt <= 3;
+        attempt++
+      ) {
+        const prompt = `
 You are an expert technical interviewer.
 
 Candidate Resume Context:
@@ -321,62 +328,77 @@ Rules:
 7. Return only the question
 `;
 
-      const response =
-        await groq.chat.completions.create(
-          {
-            model:
-              MODEL,
-            messages:
-              [
-                {
-                  role:
-                    "user",
-                  content:
-                    prompt,
-                },
-              ],
-            temperature:
-              0.9,
-          }
-        );
+        const response =
+          await groq.chat.completions.create(
+            {
+              model:
+                MODEL,
+              messages:
+                [
+                  {
+                    role:
+                      "user",
+                    content:
+                      prompt,
+                  },
+                ],
+              temperature:
+                0.7,
+            }
+          );
 
-      const question =
-        response
-          .choices?.[0]
-          ?.message
-          ?.content
-          ?.trim();
+        question =
+          response
+            .choices?.[0]
+            ?.message
+            ?.content
+            ?.trim();
 
-      if (
-        !question
-      ) {
-        throw new Error(
-          "Question generation failed"
+        if (
+          !question
+        ) {
+          continue;
+        }
+
+        const duplicate =
+          await isDuplicateQuestion(
+            resumeId,
+            question
+          );
+
+        if (
+          !duplicate
+        ) {
+          await saveQuestionMemory(
+            resumeId,
+            question
+          );
+
+          console.log(
+            `[RAG] Question generated on attempt ${attempt} ✅`
+          );
+
+          return question;
+        }
+
+        console.log(
+          `[RAG] Duplicate question detected on attempt ${attempt} ❌`
         );
       }
 
-      const duplicate =
-        await isDuplicateQuestion(
-          resumeId,
-          question
-        );
-
-      if (
-        duplicate
-      ) {
-        return `Can you explain a real-world implementation challenge you faced in ${domain}?`;
-      }
+      const fallbackQuestion =
+        `Can you describe the most challenging problem you solved while working on a ${domain} project?`;
 
       await saveQuestionMemory(
         resumeId,
-        question
+        fallbackQuestion
       );
 
       console.log(
-        "[RAG] Question generated ✅"
+        "[RAG] Using fallback question ⚠️"
       );
 
-      return question;
+      return fallbackQuestion;
     } catch (
       error
     ) {
@@ -389,6 +411,7 @@ Rules:
     }
   };
 
+  
 module.exports =
   {
     storeResumeEmbeddings,
