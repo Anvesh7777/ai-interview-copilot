@@ -66,64 +66,107 @@ const getVectorStore =
 |---------------------------------------------------------
 */
 
-const storeResumeEmbeddings =
-  async (
-    chunks,
-    resumeId
-  ) => {
-    try {
-      if (
-        !chunks ||
-        !chunks.length
-      ) {
-        throw new Error(
-          "No chunks provided."
-        );
-      }
-
-      console.log(
-        `[RAG] Storing ${chunks.length} chunks for resume ${resumeId}`
-      );
-
-      await Chroma.fromTexts(
-        chunks,
-        chunks.map(
-          (
-            _,
-            index
-          ) => ({
-            resumeId:
-              String(
-                resumeId
-              ),
-            chunkIndex:
-              index,
-            chunkType:
-              "resume",
-          })
-        ),
-        embeddings,
-        {
-          collectionName:
-            COLLECTION_NAME,
-          url:
-            CHROMA_URL,
-        }
-      );
-
-      console.log(
-        "[RAG] Embeddings stored ✅"
-      );
-    } catch (
-      error
+const storeResumeEmbeddings = async (
+  chunks,
+  resumeId
+) => {
+  try {
+    if (
+      !chunks ||
+      !chunks.length
     ) {
-      console.error(
-        "[RAG] Store Error:",
-        error.message
+      throw new Error(
+        "No chunks provided."
       );
-      throw error;
     }
-  };
+
+    console.log(
+      `[RAG] Storing ${chunks.length} chunks for resume ${resumeId}`
+    );
+
+    let lastError = null;
+
+    for (
+      let attempt = 1;
+      attempt <= 3;
+      attempt++
+    ) {
+      try {
+        await Chroma.fromTexts(
+          chunks,
+          chunks.map(
+            (_, index) => ({
+              resumeId:
+                String(
+                  resumeId
+                ),
+              chunkIndex:
+                index,
+              chunkType:
+                "resume",
+            })
+          ),
+          embeddings,
+          {
+            collectionName:
+              COLLECTION_NAME,
+            url:
+              CHROMA_URL,
+          }
+        );
+
+        console.log(
+          `[RAG] Embeddings stored on attempt ${attempt} ✅`
+        );
+
+        lastError = null;
+        break;
+      } catch (
+        error
+      ) {
+        lastError = error;
+
+        console.error(
+          `[RAG] Attempt ${attempt} failed ❌`,
+          error.message
+        );
+
+        if (
+          attempt < 3
+        ) {
+          console.log(
+            "[RAG] Retrying in 3 seconds..."
+          );
+
+          await new Promise(
+            (
+              resolve
+            ) =>
+              setTimeout(
+                resolve,
+                3000
+              )
+          );
+        }
+      }
+    }
+
+    if (
+      lastError
+    ) {
+      throw lastError;
+    }
+  } catch (
+    error
+  ) {
+    console.error(
+      "[RAG] Store Error:",
+      error.message
+    );
+
+    throw error;
+  }
+};
 
 /*
 |---------------------------------------------------------

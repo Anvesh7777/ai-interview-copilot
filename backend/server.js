@@ -69,14 +69,31 @@ const startServer =
         process.env.PORT ||
         5000;
 
-      app.listen(
-        PORT,
-        () => {
-          console.log(
-            `Server running on port ${PORT} 🚀`
-          );
-        }
+  app.listen(
+  PORT,
+  async () => {
+    console.log(
+      `Server running on port ${PORT} 🚀`
+    );
+
+    try {
+      const response =
+        await axios.get(
+          `${process.env.CHROMA_URL}/api/v1/heartbeat`
+        );
+
+      console.log(
+        "Chroma warmup successful ✅",
+        response.data
       );
+    } catch (error) {
+      console.error(
+        "Chroma warmup failed ❌",
+        error.message
+      );
+    }
+  }
+);
     } catch (
       error
     ) {
