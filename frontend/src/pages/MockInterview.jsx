@@ -44,9 +44,7 @@ function MockInterview() {
     "OOPs",
   ];
 
-  useEffect(() => {
-    localStorage.removeItem("sessionId");
-  }, []);
+
 
   useEffect(() => {
     if (!sessionId) return;
@@ -71,49 +69,59 @@ function MockInterview() {
   };
 
   const startInterview = async () => {
-    try {
-      if (!domain) {
-        alert("Please select a domain");
-        return;
-      }
-
-      const resumeId = localStorage.getItem("resumeId");
-
-      if (!resumeId) {
-        alert("Please upload resume first");
-        return;
-      }
-
-      setLoadingQuestion(true);
-
-      const response = await api.post("/interview/start", {
-        resumeId,
-        jobDescriptionId:
-          localStorage.getItem("jobDescriptionId") || null,
-        domain,
-      });
-
-      const id = response.data.sessionId;
-      const firstQuestion = response.data.firstQuestion;
-
-      setSessionId(id);
-      localStorage.setItem("sessionId", id);
-
-      setQuestion(firstQuestion);
-      setQuestionNumber(1);
-      setTimeLeft(300);
-      setFeedback(null);
-    } catch (error) {
-      console.error("Start Error:", error);
-
-      alert(
-        error.response?.data?.message ||
-          "Failed to start interview"
-      );
-    } finally {
-      setLoadingQuestion(false);
+  try {
+    if (!domain) {
+      alert("Please select a domain");
+      return;
     }
-  };
+
+    const resumeId = localStorage.getItem("resumeId");
+
+    if (!resumeId) {
+      alert("Please upload your resume first.");
+      return;
+    }
+
+    // Clear any previous interview session only when starting a new one
+    localStorage.removeItem("sessionId");
+
+    setLoadingQuestion(true);
+
+    const response = await api.post("/interview/start", {
+      resumeId,
+      jobDescriptionId:
+        localStorage.getItem("jobDescriptionId") || null,
+      domain,
+    });
+
+    const {
+      sessionId: id,
+      firstQuestion,
+    } = response.data;
+
+    // Save current interview session
+    setSessionId(id);
+    localStorage.setItem("sessionId", id);
+
+    // Initialize interview state
+    setQuestion(firstQuestion);
+    setPendingQuestion("");
+    setAnswer("");
+    setFeedback(null);
+
+    setQuestionNumber(1);
+    setTimeLeft(300);
+  } catch (error) {
+    console.error("Start Interview Error:", error);
+
+    alert(
+      error.response?.data?.message ||
+        "Failed to start interview. Please try again."
+    );
+  } finally {
+    setLoadingQuestion(false);
+  }
+};
 
   const submitAnswer = async (customAnswer = null) => {
     try {

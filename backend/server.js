@@ -80,9 +80,12 @@ const startServer =
 
     try {
       const response =
-        await axios.get(
-          `${process.env.CHROMA_URL}/api/v1/heartbeat`
-        );
+       await axios.get(
+  `${process.env.CHROMA_URL}/api/v1/heartbeat`,
+  {
+    timeout: 10000,
+  }
+);
 
       console.log(
         "Chroma warmup successful ✅",
@@ -192,26 +195,7 @@ app.use(
 |---------------------------------------------------------
 */
 
-app.get(
-  "/",
-  (
-    req,
-    res
-  ) => {
-    res.status(
-      200
-    ).json({
-      success:
-        true,
-      message:
-        "AI Interview Copilot API running 🚀",
-      environment:
-        process.env
-          .NODE_ENV ||
-        "development",
-    });
-  }
-);
+
 
 /*
 |---------------------------------------------------------
@@ -247,6 +231,22 @@ app.use(
 app.use(
   "/api/ats",
   atsRoutes
+);
+
+app.get(
+  "/api/health",
+  (req, res) => {
+    res.status(200).json({
+      success: true,
+      message:
+        "AI Interview Copilot API running 🚀",
+      environment:
+        process.env.NODE_ENV ||
+        "development",
+      timestamp:
+        new Date().toISOString(),
+    });
+  }
 );
 
 /*
@@ -302,12 +302,7 @@ app.use(
   }
 );
 
-app.get("/api/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Server is healthy",
-  });
-});
+
 
 /*
 |---------------------------------------------------------
