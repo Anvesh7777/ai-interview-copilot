@@ -52,6 +52,19 @@ const atsRoutes =
 const app =
   express();
 
+
+  app.get("/", (req, res) => {
+  res.send("SERVER VERSION 2");
+});
+
+app.get("/api/test", (req, res) => {
+  res.json({
+    success: true,
+    message: "TEST ROUTE WORKING",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 /*
 |---------------------------------------------------------
 | Database Connection
